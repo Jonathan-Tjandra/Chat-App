@@ -28,7 +28,8 @@ const joinUserToRoom = (socket, data) => {
 
   const user = {
     id: socket.id,
-    name: username || `User ${socket.id.substring(0, 5)}`
+    name: username || `User ${socket.id.substring(0, 5)}`, 
+    persistentId: data.userId
   };
   users[socket.id] = { ...user, room };
 
@@ -49,23 +50,24 @@ const joinUserToRoom = (socket, data) => {
 io.on('connection', (socket) => {
   console.log(`✅ User Connected: ${socket.id}`);
 
-  // --- NEW: Room Creation ---
   socket.on('createRoom', (data) => {
-    const { room, username, password } = data;
+    const { room, username, password, userId } = data;
     if (rooms[room]) {
-      // Room already exists
       socket.emit('roomError', { message: 'A room with this name is already active.' });
       return;
     }
-    // Create the new room
-    rooms[room] = { password: password || null, userCount: 0 };
-    console.log(`[SERVER LOG] Room created: ${room}`);
-    joinUserToRoom(socket, { room, username });
+    // Create the new room, now with a members list
+    rooms[room] = { 
+      password: password || null, 
+      userCount: 0,
+      members: [userId] // The creator is the first member
+    };
+    console.log(`[SERVER LOG] Room created: ${room} by ${userId}`);
+    joinUserToRoom(socket, { room, username, userId });
   });
 
-  // --- REVISED: Room Joining ---
   socket.on('joinRoom', (data) => {
-    const { room, username, password } = data;
+    const { room, username, password, userId } = data;
     const roomData = rooms[room];
 
     if (!roomData) {
@@ -73,14 +75,25 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (roomData.password && roomData.password !== password) {
-      // Password is required and either wasn't provided or is incorrect
-      socket.emit('roomError', { message: 'Incorrect password.', needsPassword: true });
-      return;
+    // Check if the room is private
+    if (roomData.password) {
+      // If private, check if user is already a member OR if they provided the correct password
+      const isMember = roomData.members.includes(userId);
+
+      if (!isMember && roomData.password !== password) {
+        socket.emit('roomError', { message: 'Incorrect password.', needsPassword: true });
+        return;
+      }
+
+      // If they passed the check and are not yet a member, add them
+      if (!isMember) {
+        roomData.members.push(userId);
+        console.log(`[SERVER LOG] New member ${userId} added to room: ${room}`);
+      }
     }
 
     // All checks passed, join the user
-    joinUserToRoom(socket, { room, username });
+    joinUserToRoom(socket, { room, username, userId });
   });
 
   socket.on('sendMessage', (data) => {
