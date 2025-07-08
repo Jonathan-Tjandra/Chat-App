@@ -97,6 +97,11 @@ io.on('connection', (socket) => {
     // This now sends messages to ALL members, including those on the homepage.
     io.to(data.room).emit('receiveMessage', data);
   });
+
+  socket.on('typing', (data) => {
+    // FIX: Broadcast with the user's unique socket.id for reliability
+    socket.to(data.room).emit('userTyping', { id: socket.id, isTyping: data.isTyping });
+  });
   
   socket.on('messageSeen', (data) => {
     const { messageId, room, seenByUserId } = data;

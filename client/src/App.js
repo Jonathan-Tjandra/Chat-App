@@ -85,7 +85,6 @@ function App() {
   const [error, setError] = useState('');
   const [messages, setMessages] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [typingUsers, setTypingUsers] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentRoom, setCurrentRoom] = useState('');
   const [currentUsername, setCurrentUsername] = useState('');
@@ -93,12 +92,15 @@ function App() {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [lastReadTimestamps, setLastReadTimestamps] = useState(() => getFromStorage('lastReadTimestamps') || {});
 
+  // NEW: State and ref for typing indicator
+  const [typingUsers, setTypingUsers] = useState({});
+  const typingTimeoutRef = useRef(null);
+
   const roomRef = useRef(currentRoom);
   const usernameRef = useRef(currentUsername);
   const textareaRef = useRef(null);
   const chatWindowRef = useRef(null);
   const observer = useRef(null);
-  const typingTimeoutRef = useRef(null);
 
   const unreadCounts = useMemo(() => {
     return Object.keys(joinedRooms).reduce((acc, room) => {
@@ -110,7 +112,6 @@ function App() {
   }, [messages, joinedRooms, userId, lastReadTimestamps]);
 
   useEffect(() => {
-    // This single, stable useEffect handles all socket events correctly.
     socket.on('roomError', (data) => setError(data.message));
     socket.on('joinSuccess', (userList) => {
       setJoinedRooms(prev => {
@@ -126,11 +127,6 @@ function App() {
       setMessages(prev => ({ ...prev, [data.room]: [...(prev[data.room] || []), data] }));
     });
     socket.on('roomUsers', (userList) => setOnlineUsers(userList));
-    socket.on('userTyping', ({ user, isTyping }) => {
-      if (user.id !== socket.id) {
-        setTypingUsers(prev => ({ ...prev, [user.id]: { isTyping, name: user.name } }));
-      }
-    });
     socket.on('updateMessageStatus', (data) => {
       const { messageId, room, seenBy, seenAt } = data;
       setMessages(prev => {
@@ -151,16 +147,23 @@ function App() {
     socket.on('loadHistory', (history) => {
       setMessages(prev => ({ ...prev, [roomRef.current]: history }));
     });
+    
+    socket.on('userTyping', ({ id, isTyping }) => {
+      // FIX: Use the unique ID as the key instead of the name
+      setTypingUsers(prev => ({ ...prev, [id]: isTyping }));
+    });
+
     return () => {
       socket.off('roomError');
       socket.off('joinSuccess');
       socket.off('roomUsers');
       socket.off('receiveMessage');
-      socket.off('userTyping');
       socket.off('updateMessageStatus');
       socket.off('loadHistory');
+      // NEW: Cleanup for typing listener
+      socket.off('userTyping');
     };
-  }, []); // An empty dependency array makes these listeners permanent and stable.
+  }, [joinedRooms]);
 
   useEffect(() => {
     if (chatWindowRef.current) chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
@@ -233,12 +236,14 @@ function App() {
     }
   };
 
+  // NEW: Handle typing events
   const handleTyping = () => {
-    const user = { id: socket.id, name: currentUsername || `User ${socket.id.substring(0, 5)}` };
-    socket.emit('typing', { room: currentRoom, user, isTyping: true });
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    socket.emit('typing', { room: currentRoom, name: currentUsername, isTyping: true });
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
     typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('typing', { room: currentRoom, user, isTyping: false });
+      socket.emit('typing', { room: currentRoom, name: currentUsername, isTyping: false });
     }, 2000);
   };
 
@@ -255,8 +260,6 @@ function App() {
         timestamp: Date.now(),
         seenBy: { [userId]: { name: currentUsername || 'You', seenAt: new Date() } }
       };
-      // FIX: The server now broadcasts back to the sender, so we no longer add the message locally here.
-      // This prevents the duplication bug.
       await socket.emit('sendMessage', messageData);
       setCurrentMessage('');
     }
@@ -278,7 +281,13 @@ function App() {
             <div className={`users-sidebar ${isSidebarOpen ? 'open' : ''}`}>
               <h4>Online Users</h4>
               <ul>
-                {onlineUsers.map(user => ( <li key={user.id}> {user.name}{user.id === socket.id && ' (You)'} {typingUsers[user.id]?.isTyping && <span className="sidebar-typing-indicator">...typing</span>} </li> ))}
+                {onlineUsers.map(user => (
+                    <li key={user.id}>
+                      {user.name}{user.id === socket.id && ' (You)'}
+                      {/* NEW: Display the indicator next to the user's name */}
+                      {typingUsers[user.id] && <span className="sidebar-typing-indicator">...typing</span>}
+                    </li>
+                  ))}
               </ul>
             </div>
             <div className="chat-main">
@@ -298,7 +307,9 @@ function App() {
                   </div>
                 ))}
               </div>
+
               <form className="chat-form" onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
+                {/* MODIFIED: Add the handleTyping function to onChange */}
                 <textarea ref={textareaRef} className="chat-input" value={currentMessage} placeholder="Type a message..." onChange={(e) => {setCurrentMessage(e.target.value); handleTyping();}} onKeyDown={handleKeyDown} rows={1} />
                 <button type="submit" className="send-button">Send</button>
               </form>
