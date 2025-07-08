@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef,  useCallback} from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
 const socket = io('http://localhost:4000');
 
-// FIX: Added the missing helper function definitions at the top
 const getOrCreateUserId = () => {
   let userId = localStorage.getItem('chatAppUserId');
   if (!userId) {
@@ -24,17 +23,14 @@ const getJoinedRoomsFromStorage = () => {
   }
 };
 
-// --- Reusable Join Form Component ---
 const JoinForm = ({ title, onAction, requiresPassword }) => {
   const [room, setRoom] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-
   const handleSubmit = (e) => {
     e.preventDefault();
     onAction({ room, username, password });
   };
-
   return (
     <form className="joinChatContainer" onSubmit={handleSubmit}>
       <h3>{title}</h3>
@@ -48,65 +44,124 @@ const JoinForm = ({ title, onAction, requiresPassword }) => {
   );
 };
 
+const MessageInfoModal = ({ message, currentSocketId, currentUserId, onClose }) => {
+  if (!message) return null;
 
-// --- Main App Component ---
+  const isMyMessage = message.authorId === currentSocketId;
+  const seenByEntries = Object.entries(message.seenBy || {}).filter(([id]) => id !== currentUserId);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>Message Info</h3>
+        <div className="message-info-bubble">
+          <p className="message-text">{message.message}</p>
+          <p className="message-time">{message.time}</p>
+        </div>
+        {isMyMessage ? (
+          <div className="seen-by-list">
+            <h4>Seen By</h4>
+            <ul>
+              {seenByEntries.length > 0 ? (
+                seenByEntries.map(([id, data]) => (
+                  <li key={id}>
+                    <span className="seen-by-name">{data.name}</span>
+                    <span className="seen-by-status">
+                      ✔️ Seen at {new Date(data.seenAt).toLocaleTimeString()}
+                    </span>
+                  </li>
+                ))
+              ) : (
+                <li>No one else has seen this message yet.</li>
+              )}
+            </ul>
+          </div>
+        ) : (
+          <div className="seen-by-list">
+            <h4>Receipt</h4>
+            <p>
+              You saw this message at: {message.seenBy && message.seenBy[currentUserId]
+                ? new Date(message.seenBy[currentUserId].seenAt).toLocaleTimeString()
+                : 'Not yet recorded.'}
+            </p>
+          </div>
+        )}
+        <button onClick={onClose} className="modal-close-button">Close</button>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [userId] = useState(getOrCreateUserId());
   const [uiState, setUiState] = useState('home');
   const [joinedRooms, setJoinedRooms] = useState(getJoinedRoomsFromStorage());
   const [error, setError] = useState('');
-  
   const [messages, setMessages] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
   const [currentRoom, setCurrentRoom] = useState('');
   const [currentUsername, setCurrentUsername] = useState('');
   const [currentMessage, setCurrentMessage] = useState('');
-  const [joiningRoomData, setJoiningRoomData] = useState(null);
+  const [selectedMessage, setSelectedMessage] = useState(null);
 
   const roomRef = useRef(currentRoom);
   const usernameRef = useRef(currentUsername);
-
   const textareaRef = useRef(null);
   const chatWindowRef = useRef(null);
+  const observer = useRef(null);
   const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
-
-    socket.on('roomError', (data) => {
-      setError(data.message);
-    });
-
+    socket.on('roomError', (data) => setError(data.message));
     socket.on('joinSuccess', (userList) => {
-      const newJoinedRooms = { ...joinedRooms, [roomRef.current]: { username: usernameRef.current } };
-      localStorage.setItem('joinedRooms', JSON.stringify(newJoinedRooms));
-      setJoinedRooms(newJoinedRooms);
-      
+      setJoinedRooms(prev => {
+        const newJoinedRooms = { ...prev, [roomRef.current]: { username: usernameRef.current } };
+        localStorage.setItem('joinedRooms', JSON.stringify(newJoinedRooms));
+        return newJoinedRooms;
+      });
       setOnlineUsers(userList);
       setUiState('chat');
       setError('');
     });
-    
     socket.on('receiveMessage', (data) => {
       setMessages(prev => ({ ...prev, [data.room]: [...(prev[data.room] || []), data] }));
     });
-
     socket.on('roomUsers', (userList) => setOnlineUsers(userList));
-
     socket.on('userTyping', ({ user, isTyping }) => {
       if (user.id !== socket.id) {
         setTypingUsers(prev => ({ ...prev, [user.id]: { isTyping, name: user.name } }));
       }
     });
-
+    socket.on('updateMessageStatus', (data) => {
+      const { messageId, room, seenBy, seenAt } = data;
+      setMessages(prev => {
+        const roomMessages = prev[room] || [];
+        const newRoomMessages = roomMessages.map(msg => {
+          if (msg.id === messageId) {
+            const updatedSeenBy = { ...(msg.seenBy || {}) };
+            if (!updatedSeenBy[seenBy.id]) {
+              updatedSeenBy[seenBy.id] = { name: seenBy.name, seenAt: seenAt };
+            }
+            return { ...msg, seenBy: updatedSeenBy };
+          }
+          return msg;
+        });
+        return { ...prev, [room]: newRoomMessages };
+      });
+    });
+    socket.on('loadHistory', (history) => {
+      setMessages(prev => ({ ...prev, [roomRef.current]: history }));
+    });
     return () => {
       socket.off('roomError');
       socket.off('joinSuccess');
       socket.off('roomUsers');
       socket.off('receiveMessage');
       socket.off('userTyping');
+      socket.off('updateMessageStatus');
+      socket.off('loadHistory');
     };
   }, [joinedRooms]);
 
@@ -122,11 +177,33 @@ function App() {
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [currentMessage]);
+  
+  useEffect(() => {
+    const handleIntersection = (entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const { messageId, authorId, room } = entry.target.dataset;
+          if (authorId !== socket.id) {
+            // FIX: The client's only job is to report that it saw a message.
+            // The server will handle all state updates and broadcasts.
+            socket.emit('messageSeen', { messageId, authorId, room, seenByUserId: userId });
+            observer.current.unobserve(entry.target);
+          }
+        }
+      });
+    };
+    observer.current = new IntersectionObserver(handleIntersection, { threshold: 1.0 });
+    return () => observer.current.disconnect();
+  }, [userId]);
+
+  const messageRef = useCallback(node => {
+    if (node && observer.current) {
+      observer.current.observe(node);
+    }
+  }, []);
 
   const goHome = () => {
-    if (currentRoom) {
-      socket.emit('leaveRoom', currentRoom);
-    }
+    if (currentRoom) { socket.emit('leaveRoom', currentRoom); }
     setCurrentRoom('');
     setCurrentUsername('');
     setOnlineUsers([]);
@@ -154,8 +231,7 @@ function App() {
   const rejoinRoom = (roomName) => {
     const roomData = joinedRooms[roomName];
     if (roomData) {
-      const data = { room: roomName, username: roomData.username, password: '' };
-      handleJoinRoom(data);
+      handleJoinRoom({ room: roomName, username: roomData.username, password: '' });
     }
   };
 
@@ -171,16 +247,16 @@ function App() {
   const sendMessage = async () => {
     if (currentMessage.trim() !== '') {
       const messageData = {
+        id: `${socket.id}-${Date.now()}`,
         room: currentRoom,
         authorId: socket.id,
         authorName: currentUsername || `User ${socket.id.substring(0, 5)}`,
         message: currentMessage.trim(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        seenBy: { [userId]: { name: currentUsername || 'You', seenAt: new Date() } }
       };
       await socket.emit('sendMessage', messageData);
       setCurrentMessage('');
-      const user = { id: socket.id, name: currentUsername };
-      socket.emit('typing', { room: currentRoom, user, isTyping: false });
     }
   };
 
@@ -210,9 +286,9 @@ function App() {
                 <button className="home-button" onClick={goHome}>Back to Home</button>
               </div>
               <div className="chat-window" ref={chatWindowRef}>
-                {(messages[currentRoom] || []).map((msg, index) => (
-                  <div key={index} className="message" id={socket.id === msg.authorId ? 'you' : 'other'}>
-                    <div className="message-bubble">
+                {(messages[currentRoom] || []).map((msg) => (
+                  <div key={msg.id} className="message" id={socket.id === msg.authorId ? 'you' : 'other'} ref={socket.id !== msg.authorId ? messageRef : null} data-message-id={msg.id} data-author-id={msg.authorId} data-room={msg.room} >
+                    <div className="message-bubble" onClick={() => setSelectedMessage(msg)}>
                       <p className="message-author">{socket.id !== msg.authorId && msg.authorName}</p>
                       <p className="message-text">{msg.message}</p>
                       <p className="message-time">{msg.time}</p>
@@ -252,7 +328,18 @@ function App() {
     }
   };
 
-  return <div className="App">{renderUI()}</div>;
+  return (
+    <div className="App">
+      {renderUI()}
+      <MessageInfoModal 
+        message={selectedMessage} 
+        currentSocketId={socket.id}
+        currentUserId={userId} 
+        onlineUsers={onlineUsers}
+        onClose={() => setSelectedMessage(null)} 
+      />
+    </div>
+  );
 }
 
 export default App;
