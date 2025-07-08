@@ -239,3 +239,34 @@ body {
 .send-button:hover {
   background-color: #0073e6;
 }
+
+.initial-screen {
+  text-align: center;
+  margin: auto;
+}
+
+.initial-buttons button {
+  font-size: 1.2rem;
+  padding: 15px 30px;
+  margin: 0 20px;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.back-button {
+  display: block;
+  margin: 10px auto;
+  background: none;
+  border: 1px solid #aaa;
+  color: #555;
+  border-radius: 5px;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+
+.error-message {
+  color: #d93025;
+  text-align: center;
+  margin-top: 15px;
+}

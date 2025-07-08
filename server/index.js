@@ -15,67 +15,106 @@ const io = new Server(server, {
   }
 });
 
-// This will store a mapping of socket IDs to their user object
+// --- Data Structures ---
+// rooms[roomName] = { password: '...', userCount: 0 }
+const rooms = {};
+// users[socket.id] = { name: '...', room: '...' }
 const users = {}; 
-// This will store a mapping of rooms to an array of socket IDs
-const roomUsers = {}; 
+
+// --- Helper function to join a user to a room ---
+const joinUserToRoom = (socket, data) => {
+  const { room, username } = data;
+  socket.join(room);
+
+  const user = {
+    id: socket.id,
+    name: username || `User ${socket.id.substring(0, 5)}`
+  };
+  users[socket.id] = { ...user, room };
+
+  if (rooms[room]) {
+    rooms[room].userCount++;
+  }
+
+  // Get a list of user objects for the current room
+  const usersInRoom = io.sockets.adapter.rooms.get(room);
+  const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]) : [];
+
+  console.log(`[SERVER LOG] User ${user.name} joined room: ${room}`);
+  socket.emit('joinSuccess', userList); // Notify the joining user they were successful
+  socket.to(room).emit('roomUsers', userList); // Notify everyone else in the room
+};
+
 
 io.on('connection', (socket) => {
   console.log(`✅ User Connected: ${socket.id}`);
 
-  socket.on('joinRoom', (data) => {
-    const { room, username } = data;
-    socket.join(room);
-
-    // Create and store the new user
-    const user = {
-      id: socket.id,
-      name: username || `User ${socket.id.substring(0, 5)}`
-    };
-    users[socket.id] = { ...user, room };
-
-    // Add user to the room's list
-    if (!roomUsers[room]) {
-      roomUsers[room] = [];
+  // --- NEW: Room Creation ---
+  socket.on('createRoom', (data) => {
+    const { room, username, password } = data;
+    if (rooms[room]) {
+      // Room already exists
+      socket.emit('roomError', { message: 'A room with this name is already active.' });
+      return;
     }
-    roomUsers[room].push(user);
+    // Create the new room
+    rooms[room] = { password: password || null, userCount: 0 };
+    console.log(`[SERVER LOG] Room created: ${room}`);
+    joinUserToRoom(socket, { room, username });
+  });
 
-    console.log(`[SERVER LOG] User ${user.name} joined room: ${room}`);
-    
-    // Broadcast the updated user list to the room
-    io.to(room).emit('roomUsers', roomUsers[room]);
-    console.log(`[SERVER LOG] Emitted 'roomUsers' to room ${room} with data:`, roomUsers[room]);
+  // --- REVISED: Room Joining ---
+  socket.on('joinRoom', (data) => {
+    const { room, username, password } = data;
+    const roomData = rooms[room];
+
+    if (!roomData) {
+      socket.emit('roomError', { message: 'This room does not exist.' });
+      return;
+    }
+
+    if (roomData.password && roomData.password !== password) {
+      // Password is required and either wasn't provided or is incorrect
+      socket.emit('roomError', { message: 'Incorrect password.', needsPassword: true });
+      return;
+    }
+
+    // All checks passed, join the user
+    joinUserToRoom(socket, { room, username });
   });
 
   socket.on('sendMessage', (data) => {
-    // Broadcast to the room, not just the socket
     io.to(data.room).emit('receiveMessage', data);
-    console.log(`[SERVER LOG] Emitted 'receiveMessage' to room ${data.room} with data:`, data);
   });
   
   socket.on('typing', (data) => {
     socket.broadcast.to(data.room).emit('userTyping', { user: data.user, isTyping: data.isTyping });
   });
 
+  // --- REVISED: Disconnect Logic ---
   socket.on('disconnect', () => {
     console.log(`❌ User Disconnected: ${socket.id}`);
     const user = users[socket.id];
     if (user) {
       const { room } = user;
-      // Remove user from our lists
       delete users[socket.id];
-      if (roomUsers[room]) {
-        roomUsers[room] = roomUsers[room].filter(u => u.id !== socket.id);
-        
-        // Broadcast the new user list
-        io.to(room).emit('roomUsers', roomUsers[room]);
-        console.log(`[SERVER LOG] Emitted 'roomUsers' after disconnect to room ${room}`);
+
+      if (rooms[room]) {
+        rooms[room].userCount--;
+        // If the room is now empty, delete it
+        if (rooms[room].userCount <= 0) {
+          delete rooms[room];
+          console.log(`[SERVER LOG] Room removed: ${room}`);
+        } else {
+          // Otherwise, just update the user list for remaining users
+          const usersInRoom = io.sockets.adapter.rooms.get(room);
+          const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]) : [];
+          io.to(room).emit('roomUsers', userList);
+        }
       }
     }
   });
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
