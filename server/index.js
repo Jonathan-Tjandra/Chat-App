@@ -103,7 +103,6 @@ io.on('connection', (socket) => {
         rooms[room].userCount--;
         // If the room is now empty, delete it
         if (rooms[room].userCount <= 0) {
-          delete rooms[room];
           console.log(`[SERVER LOG] Room removed: ${room}`);
         } else {
           // Otherwise, just update the user list for remaining users
@@ -114,6 +113,26 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  socket.on('leaveRoom', (room) => {
+    socket.leave(room);
+    console.log(`[SERVER LOG] User ${socket.id} left room: ${room}`);
+    
+    if (rooms[room]) {
+      // Decrement user count
+      rooms[room].userCount--;
+      // If room is now empty, delete it
+      if (rooms[room].userCount <= 0) {
+        console.log(`[SERVER LOG] Room removed: ${room}`);
+      } else {
+        // Otherwise, just update the user list for remaining users
+        const usersInRoom = io.sockets.adapter.rooms.get(room);
+        const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
+        io.to(room).emit('roomUsers', userList);
+      }
+    }
+  });
+
 });
 
 const PORT = process.env.PORT || 4000;
