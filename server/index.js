@@ -7,9 +7,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000",
@@ -17,44 +15,62 @@ const io = new Server(server, {
   }
 });
 
-// To store users in rooms
-const roomUsers = {};
+// This will store a mapping of socket IDs to their user object
+const users = {}; 
+// This will store a mapping of rooms to an array of socket IDs
+const roomUsers = {}; 
 
 io.on('connection', (socket) => {
   console.log(`✅ User Connected: ${socket.id}`);
 
-  socket.on('joinRoom', (room) => {
+  socket.on('joinRoom', (data) => {
+    const { room, username } = data;
     socket.join(room);
-    console.log(`User ${socket.id} joined room: ${room}`);
 
-    // Store user in the room
+    // Create and store the new user
+    const user = {
+      id: socket.id,
+      name: username || `User ${socket.id.substring(0, 5)}`
+    };
+    users[socket.id] = { ...user, room };
+
+    // Add user to the room's list
     if (!roomUsers[room]) {
       roomUsers[room] = [];
     }
-    roomUsers[room].push(socket.id);
-    socket.currentRoom = room; // Keep track of the user's room
+    roomUsers[room].push(user);
 
-    // Emit the updated user list to everyone in the room
+    console.log(`[SERVER LOG] User ${user.name} joined room: ${room}`);
+    
+    // Broadcast the updated user list to the room
     io.to(room).emit('roomUsers', roomUsers[room]);
+    console.log(`[SERVER LOG] Emitted 'roomUsers' to room ${room} with data:`, roomUsers[room]);
   });
 
   socket.on('sendMessage', (data) => {
-    socket.to(data.room).emit('receiveMessage', data);
+    // Broadcast to the room, not just the socket
+    io.to(data.room).emit('receiveMessage', data);
+    console.log(`[SERVER LOG] Emitted 'receiveMessage' to room ${data.room} with data:`, data);
   });
   
-  // NEW: Listen for typing events
   socket.on('typing', (data) => {
-    socket.to(data.room).emit('userTyping', { userId: socket.id, isTyping: data.isTyping });
+    socket.broadcast.to(data.room).emit('userTyping', { user: data.user, isTyping: data.isTyping });
   });
 
   socket.on('disconnect', () => {
     console.log(`❌ User Disconnected: ${socket.id}`);
-    const room = socket.currentRoom;
-    if (room && roomUsers[room]) {
-      // Remove user from the room
-      roomUsers[room] = roomUsers[room].filter(id => id !== socket.id);
-      // Emit the updated user list
-      io.to(room).emit('roomUsers', roomUsers[room]);
+    const user = users[socket.id];
+    if (user) {
+      const { room } = user;
+      // Remove user from our lists
+      delete users[socket.id];
+      if (roomUsers[room]) {
+        roomUsers[room] = roomUsers[room].filter(u => u.id !== socket.id);
+        
+        // Broadcast the new user list
+        io.to(room).emit('roomUsers', roomUsers[room]);
+        console.log(`[SERVER LOG] Emitted 'roomUsers' after disconnect to room ${room}`);
+      }
     }
   });
 });

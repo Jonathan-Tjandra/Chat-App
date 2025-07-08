@@ -1,6 +1,8 @@
 /* client/src/App.css */
 body {
-  font-family: Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   background-color: #f0f2f5;
   display: flex;
   justify-content: center;
@@ -9,9 +11,11 @@ body {
   margin: 0;
 }
 
+/* CHANGED: Made the overall chat app larger */
 .App {
-  width: 600px;
-  height: 80vh;
+  width: 80vw;
+  max-width: 1000px;
+  height: 90vh;
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -19,103 +23,12 @@ body {
   flex-direction: column;
 }
 
-.chat-window {
-  flex-grow: 1;
-  padding: 20px;
-  overflow-y: auto;
-  border-bottom: 1px solid #ddd;
-}
-
-.chat-form {
-  display: flex;
-  padding: 10px;
-}
-
-.chat-input {
-  flex-grow: 1;
-  border: 1px solid #ccc;
-  border-radius: 20px;
-  padding: 10px 15px;
-  margin-right: 10px;
-  font-size: 1rem;
-}
-
-.send-button {
-  background-color: #0084ff;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.send-button:hover {
-  background-color: #0073e6;
-}
-
-.message {
-  margin: 10px 0;
-  display: flex;
-}
-
-.message#you {
-  justify-content: flex-end;
-}
-
-.message#other {
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  max-width: 70%;
-  padding: 10px 15px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.message#you .message-bubble {
-  background-color: #bde0fe; 
-  border-radius: 20px 20px 5px 20px;
-}
-
-.message#other .message-bubble {
-  background-color: #f1f8e9; 
-  border-radius: 20px 20px 20px 5px;
-}
-
-.message-author {
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: #555;
-  margin: 0 0 8px; 
-}
-
-.message-text {
-  margin: 0;
-  font-size: 1rem;
-  /* Add this to make text color black on both bubbles */
-  color: #000;
-}
-
-.message-time {
-  font-size: 0.7rem;
-  color: #555;
-  margin: 5px 0 0;
-  align-self: flex-end;
-}
-
-.message#you .message-time {
-  color: #555;
-}
-
 .joinChatContainer {
   display: flex;
   flex-direction: column;
   justify-content: center;
   text-align: center;
-  margin-top: 50px;
+  margin: auto;
 }
 
 .joinChatContainer input {
@@ -140,34 +53,36 @@ body {
   color: #fff;
   cursor: pointer;
 }
+
 .joinChatContainer button:hover {
   background-color: #0073e6;
-}
-
-.chat-header {
-  height: 45px;
-  background: #263238;
-  position: relative;
-  color: white;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .chat-container {
   display: flex;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
+/* --- Sidebar Styles --- */
 .users-sidebar {
-  width: 200px;
+  width: 0; /* Hidden by default */
   background-color: #f7f7f7;
   border-right: 1px solid #ddd;
-  padding: 10px;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
+  transition: width 0.3s ease, padding 0.3s ease;
+  overflow: hidden; 
+  white-space: nowrap;
+  overflow-y: auto; 
+  flex-shrink: 0; /* Add this line */
+}
+
+.users-sidebar.open {
+  width: 240px;
+  padding: 10px;
 }
 
 .users-sidebar h4 {
@@ -188,16 +103,139 @@ body {
   color: #333;
 }
 
+/* NEW: Style for the typing indicator in the sidebar */
+.sidebar-typing-indicator {
+  font-style: italic;
+  color: #777;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+/* --- Main Chat Area Styles --- */
 .chat-main {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.typing-indicator {
-  height: 20px;
-  padding: 0 10px;
-  font-style: italic;
+.chat-header {
+  height: 55px;
+  background: #263238;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  flex-shrink: 0;
+}
+
+.chat-header .sidebar-toggle {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+.chat-window {
+  flex-grow: 1;
+  padding: 20px;
+  overflow-y: auto;
+  border-bottom: 1px solid #ddd;
+  background-color: #e5ddd5;
+}
+
+/* --- Message Bubble Styles --- */
+.message {
+  margin: 10px 0;
+  display: flex;
+}
+
+.message#you {
+  justify-content: flex-end;
+}
+
+.message#other {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: 10px 15px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.message#you .message-bubble {
+  background-color: #bde0fe;
+  border-radius: 20px 20px 5px 20px;
+}
+
+.message#other .message-bubble {
+  background-color: #f1f8e9;
+  border-radius: 20px 20px 20px 5px;
+}
+
+.message-author {
   font-size: 0.8rem;
-  color: #888;
+  font-weight: bold;
+  color: #555;
+  margin: 0 0 8px;
+}
+
+/* CHANGED: Added word-wrap to handle long messages */
+.message-text {
+  margin: 0;
+  font-size: 1rem;
+  color: #000;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  white-space: pre-wrap; /* Preserve line breaks */
+}
+
+.message-time {
+  font-size: 0.7rem;
+  color: #555;
+  margin: 5px 0 0;
+  align-self: flex-end;
+}
+
+/* --- Chat Input Form Styles --- */
+.chat-form {
+  display: flex;
+  padding: 10px;
+  background-color: #f0f0f0;
+  align-items: flex-start; /* Align items to the top */
+}
+
+/* CHANGED: Styles updated for a textarea */
+.chat-input {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: none; /* Disable manual resizing */
+  min-height: 24px; /* Roughly 1 line */
+  max-height: 80px; /* Roughly 4 lines */
+  overflow-y: auto; /* Enable scrolling after max-height */
+  margin-right: 10px;
+}
+
+.send-button {
+  background-color: #0084ff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1rem;
+  flex-shrink: 0; /* Prevent the button from shrinking */
+}
+
+.send-button:hover {
+  background-color: #0073e6;
 }
