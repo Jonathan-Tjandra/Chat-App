@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef,  useCallback} from 'react';
+import React, { useEffect, useState, useRef,  useCallback, useMemo } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
@@ -13,13 +13,12 @@ const getOrCreateUserId = () => {
   return userId;
 };
 
-const getJoinedRoomsFromStorage = () => {
+const getFromStorage = (key) => {
   try {
-    const rooms = localStorage.getItem('joinedRooms');
-    return rooms ? JSON.parse(rooms) : {};
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
   } catch (error) {
-    console.error("Could not parse joinedRooms from localStorage", error);
-    return {};
+    return null;
   }
 };
 
@@ -44,12 +43,10 @@ const JoinForm = ({ title, onAction, requiresPassword }) => {
   );
 };
 
-const MessageInfoModal = ({ message, currentSocketId, currentUserId, onClose }) => {
+const MessageInfoModal = ({ message, currentUserId, onClose }) => {
   if (!message) return null;
-
-  const isMyMessage = message.authorId === currentSocketId;
+  const isMyMessage = message.authorUserId === currentUserId;
   const seenByEntries = Object.entries(message.seenBy || {}).filter(([id]) => id !== currentUserId);
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -64,26 +61,15 @@ const MessageInfoModal = ({ message, currentSocketId, currentUserId, onClose }) 
             <ul>
               {seenByEntries.length > 0 ? (
                 seenByEntries.map(([id, data]) => (
-                  <li key={id}>
-                    <span className="seen-by-name">{data.name}</span>
-                    <span className="seen-by-status">
-                      ✔️ Seen at {new Date(data.seenAt).toLocaleTimeString()}
-                    </span>
-                  </li>
+                  <li key={id}><span className="seen-by-name">{data.name}</span><span className="seen-by-status">✔️ Seen at {new Date(data.seenAt).toLocaleTimeString()}</span></li>
                 ))
-              ) : (
-                <li>No one else has seen this message yet.</li>
-              )}
+              ) : ( <li>No one else has seen this message yet.</li> )}
             </ul>
           </div>
         ) : (
           <div className="seen-by-list">
             <h4>Receipt</h4>
-            <p>
-              You saw this message at: {message.seenBy && message.seenBy[currentUserId]
-                ? new Date(message.seenBy[currentUserId].seenAt).toLocaleTimeString()
-                : 'Not yet recorded.'}
-            </p>
+            <p>You saw this message at: {message.seenBy && message.seenBy[currentUserId] ? new Date(message.seenBy[currentUserId].seenAt).toLocaleTimeString() : 'Not yet recorded.'}</p>
           </div>
         )}
         <button onClick={onClose} className="modal-close-button">Close</button>
@@ -95,7 +81,7 @@ const MessageInfoModal = ({ message, currentSocketId, currentUserId, onClose }) 
 function App() {
   const [userId] = useState(getOrCreateUserId());
   const [uiState, setUiState] = useState('home');
-  const [joinedRooms, setJoinedRooms] = useState(getJoinedRoomsFromStorage());
+  const [joinedRooms, setJoinedRooms] = useState(() => getFromStorage('joinedRooms') || {});
   const [error, setError] = useState('');
   const [messages, setMessages] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -105,6 +91,7 @@ function App() {
   const [currentUsername, setCurrentUsername] = useState('');
   const [currentMessage, setCurrentMessage] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [lastReadTimestamps, setLastReadTimestamps] = useState(() => getFromStorage('lastReadTimestamps') || {});
 
   const roomRef = useRef(currentRoom);
   const usernameRef = useRef(currentUsername);
@@ -113,7 +100,17 @@ function App() {
   const observer = useRef(null);
   const typingTimeoutRef = useRef(null);
 
+  const unreadCounts = useMemo(() => {
+    return Object.keys(joinedRooms).reduce((acc, room) => {
+      const roomMessages = messages[room] || [];
+      const lastRead = lastReadTimestamps[room] || 0;
+      acc[room] = roomMessages.filter(msg => msg.timestamp > lastRead && msg.authorUserId !== userId).length;
+      return acc;
+    }, {});
+  }, [messages, joinedRooms, userId, lastReadTimestamps]);
+
   useEffect(() => {
+    // This single, stable useEffect handles all socket events correctly.
     socket.on('roomError', (data) => setError(data.message));
     socket.on('joinSuccess', (userList) => {
       setJoinedRooms(prev => {
@@ -163,13 +160,11 @@ function App() {
       socket.off('updateMessageStatus');
       socket.off('loadHistory');
     };
-  }, [joinedRooms]);
+  }, []); // An empty dependency array makes these listeners permanent and stable.
 
   useEffect(() => {
-    if (chatWindowRef.current) {
-      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
-    }
-  }, [messages[currentRoom]]);
+    if (chatWindowRef.current) chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+  }, [messages, currentRoom]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -184,8 +179,6 @@ function App() {
         if (entry.isIntersecting) {
           const { messageId, authorId, room } = entry.target.dataset;
           if (authorId !== socket.id) {
-            // FIX: The client's only job is to report that it saw a message.
-            // The server will handle all state updates and broadcasts.
             socket.emit('messageSeen', { messageId, authorId, room, seenByUserId: userId });
             observer.current.unobserve(entry.target);
           }
@@ -203,7 +196,12 @@ function App() {
   }, []);
 
   const goHome = () => {
-    if (currentRoom) { socket.emit('leaveRoom', currentRoom); }
+    if (currentRoom) {
+      socket.emit('leaveRoom', currentRoom);
+      const newTimestamps = { ...lastReadTimestamps, [currentRoom]: Date.now() };
+      setLastReadTimestamps(newTimestamps);
+      localStorage.setItem('lastReadTimestamps', JSON.stringify(newTimestamps));
+    }
     setCurrentRoom('');
     setCurrentUsername('');
     setOnlineUsers([]);
@@ -250,11 +248,15 @@ function App() {
         id: `${socket.id}-${Date.now()}`,
         room: currentRoom,
         authorId: socket.id,
+        authorUserId: userId,
         authorName: currentUsername || `User ${socket.id.substring(0, 5)}`,
         message: currentMessage.trim(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now(),
         seenBy: { [userId]: { name: currentUsername || 'You', seenAt: new Date() } }
       };
+      // FIX: The server now broadcasts back to the sender, so we no longer add the message locally here.
+      // This prevents the duplication bug.
       await socket.emit('sendMessage', messageData);
       setCurrentMessage('');
     }
@@ -287,9 +289,9 @@ function App() {
               </div>
               <div className="chat-window" ref={chatWindowRef}>
                 {(messages[currentRoom] || []).map((msg) => (
-                  <div key={msg.id} className="message" id={socket.id === msg.authorId ? 'you' : 'other'} ref={socket.id !== msg.authorId ? messageRef : null} data-message-id={msg.id} data-author-id={msg.authorId} data-room={msg.room} >
+                  <div key={msg.id} className="message" id={msg.authorUserId === userId ? 'you' : 'other'} ref={msg.authorUserId !== userId ? messageRef : null} data-message-id={msg.id} data-author-id={msg.authorId} data-room={msg.room} >
                     <div className="message-bubble" onClick={() => setSelectedMessage(msg)}>
-                      <p className="message-author">{socket.id !== msg.authorId && msg.authorName}</p>
+                      <p className="message-author">{msg.authorUserId !== userId && msg.authorName}</p>
                       <p className="message-text">{msg.message}</p>
                       <p className="message-time">{msg.time}</p>
                     </div>
@@ -317,8 +319,15 @@ function App() {
               {Object.keys(joinedRooms).length === 0 ? ( <p>You haven't joined any rooms yet.</p> ) : (
                 Object.keys(joinedRooms).map(roomName => (
                   <div key={roomName} className="room-item" onClick={() => rejoinRoom(roomName)}>
-                    <h4>{roomName}</h4>
-                    <p>Joined as: {joinedRooms[roomName].username}</p>
+                    <div className="room-item-details">
+                      <h4>{roomName}</h4>
+                      <p>Joined as: {joinedRooms[roomName].username}</p>
+                    </div>
+                    {unreadCounts[roomName] > 0 && (
+                      <div className="unread-badge">
+                        {unreadCounts[roomName] > 9 ? '9+' : unreadCounts[roomName]}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -333,9 +342,7 @@ function App() {
       {renderUI()}
       <MessageInfoModal 
         message={selectedMessage} 
-        currentSocketId={socket.id}
         currentUserId={userId} 
-        onlineUsers={onlineUsers}
         onClose={() => setSelectedMessage(null)} 
       />
     </div>

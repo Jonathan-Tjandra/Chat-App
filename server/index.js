@@ -30,22 +30,35 @@ const joinUserToRoom = (socket, data) => {
   };
   users[socket.id] = { ...user, room };
 
-  if (rooms[room]) {
-    rooms[room].userCount++;
-  }
+  if (rooms[room]) { rooms[room].userCount++; }
 
   const usersInRoom = io.sockets.adapter.rooms.get(room);
   const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
 
-  // Send the room's message history (with seenBy data) to the joining user
   socket.emit('loadHistory', messageHistory[room] || []);
-  
   socket.emit('joinSuccess', userList);
   socket.to(room).emit('roomUsers', userList);
 };
 
+
 io.on('connection', (socket) => {
-  console.log(`✅ User Connected: ${socket.id}`);
+  const handleUserLeave = (socket) => {
+    const user = users[socket.id];
+    if (user) {
+      const { room } = user;
+      delete users[socket.id];
+      if (rooms[room]) {
+        rooms[room].userCount--;
+        if (rooms[room].userCount <= 0) {
+          console.log(`[SERVER LOG] Room is now empty: ${room}`);
+        } else {
+          const usersInRoom = io.sockets.adapter.rooms.get(room);
+          const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
+          io.to(room).emit('roomUsers', userList);
+        }
+      }
+    }
+  };
 
   socket.on('createRoom', (data) => {
     const { room, username, password, userId } = data;
@@ -70,45 +83,36 @@ io.on('connection', (socket) => {
         socket.emit('roomError', { message: 'Incorrect password.' });
         return;
       }
-      if (!isMember) {
-        roomData.members.push(userId);
-      }
+      if (!isMember) { roomData.members.push(userId); }
     }
     joinUserToRoom(socket, { room, username, userId });
   });
 
   socket.on('sendMessage', (data) => {
-    if (!messageHistory[data.room]) {
-      messageHistory[data.room] = [];
-    }
+    if (!messageHistory[data.room]) { messageHistory[data.room] = []; }
     messageHistory[data.room].push(data);
-    if (messageHistory[data.room].length > 50) {
-      messageHistory[data.room].shift();
-    }
+    if (messageHistory[data.room].length > 50) { messageHistory[data.room].shift(); }
+
+    // FIX: Broadcast to the reliable Socket.IO room.
+    // This now sends messages to ALL members, including those on the homepage.
     io.to(data.room).emit('receiveMessage', data);
   });
   
-  // FIX: This handler now updates the server's history, making 'seen' status persistent.
   socket.on('messageSeen', (data) => {
     const { messageId, room, seenByUserId } = data;
     const seenByUser = Object.values(users).find(u => u.persistentId === seenByUserId);
-
     if (!seenByUser) return;
-
-    // Find the message in our history
+    
     const roomHistory = messageHistory[room] || [];
     const messageToUpdate = roomHistory.find(msg => msg.id === messageId);
 
-    // Only update if the message exists and this user hasn't seen it before
     if (messageToUpdate && !messageToUpdate.seenBy[seenByUserId]) {
       const seenAt = new Date();
-      // Update the canonical message object in the server's history
       messageToUpdate.seenBy[seenByUserId] = { name: seenByUser.name, seenAt: seenAt };
-
-      // Broadcast the update to ALL users in the room so their UIs are in sync
+      
+      // FIX: Broadcast the status update to the reliable Socket.IO room.
       io.to(room).emit('updateMessageStatus', {
-        messageId,
-        room,
+        messageId, room,
         seenBy: { id: seenByUser.persistentId, name: seenByUser.name },
         seenAt: seenAt,
       });
@@ -116,35 +120,21 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leaveRoom', (room) => {
-    socket.leave(room);
-    if (rooms[room]) {
+    // Note: We no longer call socket.leave(room). The user stays subscribed.
+    // We just update the online user count for the UI.
+    const user = users[socket.id];
+    if (user && rooms[room]) {
       rooms[room].userCount--;
-      if (rooms[room].userCount <= 0) { console.log(`[SERVER LOG] Room is now empty: ${room}`); } 
-      else {
+      if (rooms[room].userCount > 0) { 
         const usersInRoom = io.sockets.adapter.rooms.get(room);
         const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
-        io.to(room).emit('roomUsers', userList);
+        // We only tell users who are *currently viewing* the chat room about the updated online list.
+        socket.to(room).emit('roomUsers', userList);
       }
     }
   });
 
-  socket.on('disconnect', () => {
-    const user = users[socket.id];
-    if (user) {
-      const { room } = user;
-      delete users[socket.id];
-      if (rooms[room]) {
-        rooms[room].userCount--;
-        if (rooms[room].userCount <= 0) {
-          console.log(`[SERVER LOG] Room is now empty: ${room}`);
-        } else {
-          const usersInRoom = io.sockets.adapter.rooms.get(room);
-          const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
-          io.to(room).emit('roomUsers', userList);
-        }
-      }
-    }
-  });
+  socket.on('disconnect', () => handleUserLeave(socket));
 });
 
 const PORT = process.env.PORT || 4000;

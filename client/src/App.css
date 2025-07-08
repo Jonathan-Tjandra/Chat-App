@@ -441,3 +441,24 @@ body {
   margin-top: 20px; /* Add space above the button */
   flex-shrink: 0; /* Prevent from shrinking */
 }
+
+.room-item {
+  /* Add this to enable flexbox for badge alignment */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.unread-badge {
+  background-color: #f44336; /* Red color */
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 50%; /* Make it a circle */
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0; /* Prevent it from shrinking */
+}
