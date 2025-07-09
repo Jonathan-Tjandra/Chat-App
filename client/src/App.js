@@ -59,7 +59,7 @@ const JoinForm = ({ title, onAction, isCreating, requiresPassword }) => {
         <input type="text" placeholder="Room Name..." value={room} onChange={(e) => setRoom(e.target.value)} required />
       )}
 
-      {requiresPassword && (
+      {(requiresPassword || !isCreating) && (
         <input type="password" placeholder="Password (Optional)..." value={password} onChange={(e) => setPassword(e.target.value)} />
       )}
       <button type="submit">{title}</button>
@@ -285,6 +285,13 @@ function App() {
   // FIXED: Function to join room
   const joinRoom = (formData) => {
     const { room, password } = formData;
+    
+    // Check if user is already in this room
+    if (joinedRooms[room]) {
+      setError('You are already in this room');
+      return;
+    }
+    
     socket.emit('joinRoom', { 
       room, 
       username: currentUsername, 
@@ -639,11 +646,11 @@ function App() {
             <span className="message-time">{msg.time}</span>
           </div>
           <div className="message-text">{msg.message}</div>
-          {msg.authorUserId === userId && (
-            <div className="message-status">
-              {Object.keys(msg.seenBy || {}).length > 1 ? '✓✓' : '✓'}
-            </div>
-          )}
+            {msg.authorUserId === userId && (
+              <div className="message-status">
+                {Object.keys(msg.seenBy || {}).length >= onlineUsers.length ? '✓✓' : '✓'}
+              </div>
+            )}
         </div>
       </div>
     ));
@@ -691,7 +698,7 @@ function App() {
                 title="Join Room" 
                 onAction={joinRoom}
                 isCreating={false}
-                requiresPassword={false}
+                requiresPassword={true}
               />
             </div>
             
@@ -741,7 +748,6 @@ function App() {
                 {onlineUsers.map(user => {
                   // activeViewers is an array of socket ID strings
                   const isActiveViewer = activeViewers.includes(user.id);
-                  console.log('activeViewers array:', activeViewers);
                   
                   return (
                     <li key={user.id} className="user-list-item">
