@@ -120,7 +120,7 @@ const DeleteConfirmationModal = ({ roomName, onConfirm, onCancel }) => {
   );
 };
 
-// FIXED: Creator delete confirmation modal
+//  Creator delete confirmation modal
 const CreatorDeleteConfirmationModal = ({ roomName, onConfirm, onCancel }) => {
   if (!roomName) return null;
   
@@ -154,7 +154,7 @@ const CreatorDeleteConfirmationModal = ({ roomName, onConfirm, onCancel }) => {
   );
 };
 
-// FIXED: Deleted room notification component
+//  Deleted room notification component
 const DeletedRoomNotification = ({ roomName, deletedBy, deletedAt, onDismiss }) => {
   return (
     <div className="deleted-room-notification">
@@ -232,7 +232,7 @@ function App() {
     }
   };
 
-  // FIXED: Creator delete confirmation
+  //  Creator delete confirmation
   const confirmCreatorDelete = (action) => {
     if (creatorDeleteConfirmation) {
       if (action === 'delete') {
@@ -266,7 +266,7 @@ function App() {
     socket.emit('dismissDeletedRoom', { room: roomName, userId });
   };
 
-  // FIXED: Function to handle room clicks
+  //  Function to handle room clicks
   const handleRoomClick = (roomName) => {
     // Check if this room was deleted by creator
     if (deletedRooms[roomName]) {
@@ -286,7 +286,7 @@ function App() {
     }
   };
 
-  // FIXED: Function to create room
+  //  Function to create room
   const createRoom = (formData) => {
     const { password } = formData;
     socket.emit('createRoom', { 
@@ -296,7 +296,7 @@ function App() {
     });
   };
 
-  // FIXED: Function to join room
+  //  Function to join room
   const joinRoom = (formData) => {
     const { room, password } = formData;
     
@@ -314,7 +314,7 @@ function App() {
     });
   };
 
-  // FIXED: Function to send message
+  //  Function to send message
   const sendMessage = () => {
     if (currentMessage.trim() && currentRoom) {
       const messageData = {
@@ -337,7 +337,7 @@ function App() {
     }
   };
 
-  // FIXED: Function to handle typing
+  //  Function to handle typing
   const handleTyping = (e) => {
     setCurrentMessage(e.target.value);
     
@@ -351,7 +351,7 @@ function App() {
     }
   };
 
-  // FIXED: Function to handle key press
+  //  Function to handle key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -470,7 +470,7 @@ function App() {
       }
     });
 
-    // FIXED: Handle room deleted by creator
+    //  Handle room deleted by creator
     socket.on('roomDeletedByCreator', (data) => {
       const { room, deletedBy, deletedAt } = data;
       
@@ -531,7 +531,7 @@ function App() {
     };
   }, [uiState, currentRoom, joinedRooms, userId]);
 
-  // FIXED: Update roomRef and usernameRef
+  //  Update roomRef and usernameRef
   useEffect(() => {
     roomRef.current = currentRoom;
     usernameRef.current = currentUsername;
@@ -569,7 +569,7 @@ function App() {
     };
   }, [userId]);
 
-  // FIXED: Update last read timestamp when entering chat view
+  //  Update last read timestamp when entering chat view
   useEffect(() => {
     if (uiState === 'chat' && currentRoom) {
       const currentTime = Date.now();
@@ -586,7 +586,21 @@ function App() {
     setShowChatSearch(false);
   }, [currentRoom]);
 
-  // FIXED: Render function for room list
+  useEffect(() => {
+    if (uiState === 'chat' && currentRoom && messages[currentRoom]) {
+      const roomMessages = messages[currentRoom];
+      if (roomMessages.length > 0) {
+        const latestTimestamp = roomMessages[roomMessages.length - 1].timestamp;
+        setLastReadTimestamps(prev => {
+          const newTimestamps = { ...prev, [currentRoom]: latestTimestamp };
+          localStorage.setItem('lastReadTimestamps', JSON.stringify(newTimestamps));
+          return newTimestamps;
+        });
+      }
+    }
+  }, [messages, currentRoom, uiState]);
+
+  //  Render function for room list
   const renderRoomList = () => {
     const roomEntries = Object.entries(joinedRooms);
     const deletedRoomEntries = Object.entries(deletedRooms);
@@ -678,7 +692,7 @@ function App() {
     );
   };
 
-  // FIXED: Render function for chat messages
+  //  Render function for chat messages
   const renderMessages = () => {
     const roomMessages = messages[currentRoom] || [];
     
@@ -727,25 +741,7 @@ function App() {
     ));
   };
 
-  // FIXED: Render function for typing indicators
-  const renderTypingIndicators = () => {
-    const typingUsersList = Object.entries(typingUsers)
-      .filter(([id, isTyping]) => isTyping && id !== socket.id)
-      .map(([id]) => {
-        const user = onlineUsers.find(u => u.id === id);
-        return user ? user.name : 'Someone';
-      });
-    
-    if (typingUsersList.length === 0) return null;
-    
-    return (
-      <div className="typing-indicator">
-        {typingUsersList.join(', ')} {typingUsersList.length === 1 ? 'is' : 'are'} typing...
-      </div>
-    );
-  };
-
-  // FIXED: Main render logic
+  //  Main render logic
   if (uiState === 'home') {
     return (
       <div className="app">
@@ -816,14 +812,15 @@ function App() {
               <h4>Room Members ({onlineUsers.length})</h4>
               <ul>
                 {onlineUsers.map(user => {
-                  // activeViewers is an array of socket ID strings
                   const isActiveViewer = activeViewers.includes(user.id);
+                  const isTyping = typingUsers[user.id]; // Add this line
                   
                   return (
                     <li key={user.id} className="user-list-item">
                       {isActiveViewer && <span className="online-status-dot"></span>}
                       <span className="user-name">{user.name}</span>
                       {user.persistentId === userId && <span className="you-badge">(You)</span>}
+                      {isTyping && <div className="user-typing-indicator">typing...</div>}
                     </li>
                   );
                 })}
@@ -879,7 +876,6 @@ function App() {
             
             <div className="chat-messages" ref={chatWindowRef}>
               {renderMessages()}
-              {renderTypingIndicators()}
             </div>
             
             <div className="chat-input">
