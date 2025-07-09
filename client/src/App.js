@@ -198,6 +198,10 @@ function App() {
   const [deletedRooms, setDeletedRooms] = useState(() => getFromStorage('deletedRooms') || {});
   const [creatorDeleteConfirmation, setCreatorDeleteConfirmation] = useState(null);
 
+  const [roomSearch, setRoomSearch] = useState('');
+  const [chatSearch, setChatSearch] = useState('');
+  const [showChatSearch, setShowChatSearch] = useState(false);
+
   const unreadCounts = useMemo(() => {
     return Object.keys(joinedRooms).reduce((acc, room) => {
       const roomMessages = messages[room] || [];
@@ -206,6 +210,16 @@ function App() {
       return acc;
     }, {});
   }, [messages, joinedRooms, userId, lastReadTimestamps]);
+
+  const copyRoomName = (roomName, e) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(roomName).then(() => {
+        // You could add a toast notification here
+        console.log('Room name copied!');
+      }).catch(err => {
+        console.error('Failed to copy room name:', err);
+      });
+   };
 
   const deleteRoom = (roomName, e) => {
     e.stopPropagation();
@@ -567,17 +581,48 @@ function App() {
     }
   }, [uiState, currentRoom]);
 
+ useEffect(() => {
+    setChatSearch('');
+    setShowChatSearch(false);
+  }, [currentRoom]);
+
   // FIXED: Render function for room list
   const renderRoomList = () => {
     const roomEntries = Object.entries(joinedRooms);
     const deletedRoomEntries = Object.entries(deletedRooms);
     
+    // Filter rooms based on search
+    const filteredRoomEntries = roomEntries.filter(([roomName]) =>
+      roomName.toLowerCase().includes(roomSearch.toLowerCase())
+    );
+    
     return (
       <div className="room-list">
         <h3>Your Rooms</h3>
         
+        {/* Room Search */}
+        <div className="room-search-container">
+          <div className="search-container">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search rooms..."
+              value={roomSearch}
+              onChange={(e) => setRoomSearch(e.target.value)}
+            />
+          </div>
+          {roomSearch && (
+            <button 
+              className="search-clear-external"
+              onClick={() => setRoomSearch('')}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        
         {/* Active Rooms */}
-        {roomEntries.map(([roomName, roomData]) => (
+        {filteredRoomEntries.map(([roomName, roomData]) => (
           <div 
             key={roomName}
             className={`room-item ${deletedRooms[roomName] ? 'deleted-room' : ''}`}
@@ -591,12 +636,21 @@ function App() {
               )}
             </div>
             {!deletedRooms[roomName] && (
-              <button 
-                className="delete-room-btn"
-                onClick={(e) => deleteRoom(roomName, e)}
-              >
-                ×
-              </button>
+              <div className="room-actions">
+                <button 
+                  className="copy-room-btn"
+                  onClick={(e) => copyRoomName(roomName, e)}
+                  title="Copy room name"
+                >
+                  📋
+                </button>
+                <button 
+                  className="delete-room-btn"
+                  onClick={(e) => deleteRoom(roomName, e)}
+                >
+                  ×
+                </button>
+              </div>
             )}
           </div>
         ))}
@@ -613,7 +667,11 @@ function App() {
           </div>
         ))}
         
-        {roomEntries.length === 0 && deletedRoomEntries.length === 0 && (
+        {filteredRoomEntries.length === 0 && deletedRoomEntries.length === 0 && roomSearch && (
+          <p className="no-rooms">No rooms found matching "{roomSearch}"</p>
+        )}
+        
+        {roomEntries.length === 0 && deletedRoomEntries.length === 0 && !roomSearch && (
           <p className="no-rooms">No rooms yet. Create or join a room to get started!</p>
         )}
       </div>
@@ -624,10 +682,23 @@ function App() {
   const renderMessages = () => {
     const roomMessages = messages[currentRoom] || [];
     
-    return roomMessages.map((msg) => (
+    // Filter messages based on search
+    const filteredMessages = chatSearch 
+      ? roomMessages.filter(msg => 
+          msg.message.toLowerCase().includes(chatSearch.toLowerCase()) ||
+          msg.author.toLowerCase().includes(chatSearch.toLowerCase())
+        )
+      : roomMessages;
+    
+    return filteredMessages.map((msg) => (
       <div 
         key={msg.id}
-        className={`message ${msg.authorUserId === userId ? 'own-message' : 'other-message'}`}
+        className={`message ${msg.authorUserId === userId ? 'own-message' : 'other-message'} ${
+          chatSearch && (
+            msg.message.toLowerCase().includes(chatSearch.toLowerCase()) ||
+            msg.author.toLowerCase().includes(chatSearch.toLowerCase())
+          ) ? 'highlighted-message' : ''
+        }`}
         data-message-id={msg.id}
         data-author-id={msg.authorUserId}
         data-room={currentRoom}
@@ -646,11 +717,11 @@ function App() {
             <span className="message-time">{msg.time}</span>
           </div>
           <div className="message-text">{msg.message}</div>
-            {msg.authorUserId === userId && (
-              <div className="message-status">
-                {Object.keys(msg.seenBy || {}).length >= onlineUsers.length ? '✓✓' : '✓'}
-              </div>
-            )}
+          {msg.authorUserId === userId && (
+            <div className="message-status">
+              {Object.keys(msg.seenBy || {}).length >= onlineUsers.length ? '✓✓' : '✓'}
+            </div>
+          )}
         </div>
       </div>
     ));
@@ -728,7 +799,6 @@ function App() {
         <div className="chat-container">
           <div className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
             <div className="sidebar-header">
-              <h3>Room: {currentRoom}</h3>
               <button 
                 className="back-button"
                 onClick={() => {
@@ -768,14 +838,44 @@ function App() {
           
           <div className="chat-main">
             <div className="chat-header">
+              <div className="left-section">
+                <button 
+                  className="sidebar-toggle"
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                >
+                  {isSidebarOpen ? '←' : '→'}
+                </button>
+                <h2>{currentRoom}</h2>
+              </div>
               <button 
-                className="sidebar-toggle"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="search-toggle"
+                onClick={() => setShowChatSearch(!showChatSearch)}
               >
-                {isSidebarOpen ? '←' : '→'}
+                {showChatSearch ? '✕' : '🔍'}
               </button>
-              <h2>{currentRoom}</h2>
             </div>
+
+            {showChatSearch && (
+              <div className="chat-search-container">
+                <div className="search-container">
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search messages..."
+                    value={chatSearch}
+                    onChange={(e) => setChatSearch(e.target.value)}
+                  />
+                </div>
+                {chatSearch && (
+                  <button 
+                    className="search-clear-external"
+                    onClick={() => setChatSearch('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
             
             <div className="chat-messages" ref={chatWindowRef}>
               {renderMessages()}
