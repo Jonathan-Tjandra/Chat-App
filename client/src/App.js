@@ -736,23 +736,23 @@ function App() {
             </div>
             
             <div className="online-users">
-  <h4>Online Users ({onlineUsers.length})</h4>
-  <ul>
-    {onlineUsers.map(user => {
-      // activeViewers is an array of socket ID strings
-      const isActiveViewer = activeViewers.includes(user.id);
-      console.log('activeViewers array:', activeViewers);
-      
-      return (
-        <li key={user.id} className="user-list-item">
-          {isActiveViewer && <span className="online-status-dot"></span>}
-          <span className="user-name">{user.name}</span>
-          {user.persistentId === userId && <span className="you-badge">(You)</span>}
-        </li>
-      );
-    })}
-  </ul>
-</div>
+              <h4>Online Users ({onlineUsers.length})</h4>
+              <ul>
+                {onlineUsers.map(user => {
+                  // activeViewers is an array of socket ID strings
+                  const isActiveViewer = activeViewers.includes(user.id);
+                  console.log('activeViewers array:', activeViewers);
+                  
+                  return (
+                    <li key={user.id} className="user-list-item">
+                      {isActiveViewer && <span className="online-status-dot"></span>}
+                      <span className="user-name">{user.name}</span>
+                      {user.persistentId === userId && <span className="you-badge">(You)</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
             
             <div className="active-viewers">
               <h4>Active Viewers ({activeViewers.length})</h4>
