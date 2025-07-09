@@ -18,7 +18,18 @@ const io = new Server(server, {
 const rooms = {};
 const users = {}; 
 const messageHistory = {};
+const activeViewers = {};
 
+const generateRandomId = (length) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+// Update the joinUserToRoom function
 const joinUserToRoom = (socket, data) => {
   const { room, username, userId } = data;
   socket.join(room);
@@ -30,16 +41,24 @@ const joinUserToRoom = (socket, data) => {
   };
   users[socket.id] = { ...user, room };
 
-  if (rooms[room]) { rooms[room].userCount++; }
+  if (rooms[room]) {
+    rooms[room].userCount++;
+  }
 
   const usersInRoom = io.sockets.adapter.rooms.get(room);
   const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
 
   socket.emit('loadHistory', messageHistory[room] || []);
-  socket.emit('joinSuccess', userList);
+  
+  // Pass creator info
+  socket.emit('joinSuccess', { 
+    userList: userList, 
+    roomName: room,
+    isCreator: rooms[room] && rooms[room].creator === userId
+  });
+
   socket.to(room).emit('roomUsers', userList);
 };
-
 
 io.on('connection', (socket) => {
   const handleUserLeave = (socket) => {
@@ -47,6 +66,14 @@ io.on('connection', (socket) => {
     if (user) {
       const { room } = user;
       delete users[socket.id];
+      
+      // Clean up active viewers
+      if (activeViewers[room]) {
+        activeViewers[room].delete(socket.id);
+        const viewerList = Array.from(activeViewers[room]);
+        io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
+      }
+      
       if (rooms[room]) {
         rooms[room].userCount--;
         if (rooms[room].userCount <= 0) {
@@ -60,15 +87,46 @@ io.on('connection', (socket) => {
     }
   };
 
-  socket.on('createRoom', (data) => {
-    const { room, username, password, userId } = data;
-    if (rooms[room]) {
-      socket.emit('roomError', { message: 'A room with this name is already active.' });
-      return;
+  socket.on('enterChatView', (data) => {
+    const { room } = data;
+    if (!activeViewers[room]) {
+      activeViewers[room] = new Set();
     }
-    rooms[room] = { password: password || null, userCount: 0, members: [userId] };
-    joinUserToRoom(socket, { room, username, userId });
+    activeViewers[room].add(socket.id);
+    
+    // Broadcast updated viewer list to room
+    const viewerList = Array.from(activeViewers[room]);
+    io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
   });
+
+  socket.on('leaveChatView', (data) => {
+    const { room } = data;
+    if (activeViewers[room]) {
+      activeViewers[room].delete(socket.id);
+      
+      // Broadcast updated viewer list to room
+      const viewerList = Array.from(activeViewers[room]);
+      io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
+    }
+  });
+
+  socket.on('createRoom', (data) => {
+  const { username, password, userId } = data;
+  
+  let roomName;
+  do {
+    roomName = `R#${generateRandomId(8)}`;
+  } while (rooms[roomName]);
+
+  rooms[roomName] = { 
+    password: password || null, 
+    userCount: 0, 
+    members: [userId],
+    creator: userId // Add this line to track creator
+  };
+  
+  joinUserToRoom(socket, { room: roomName, username, userId });
+});
 
   socket.on('joinRoom', (data) => {
     const { room, username, password, userId } = data;
@@ -125,21 +183,136 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leaveRoom', (room) => {
-    // Note: We no longer call socket.leave(room). The user stays subscribed.
-    // We just update the online user count for the UI.
+  // Remove from active viewers when leaving room
+    if (activeViewers[room]) {
+      activeViewers[room].delete(socket.id);
+      const viewerList = Array.from(activeViewers[room]);
+      io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
+    }
+    
     const user = users[socket.id];
     if (user && rooms[room]) {
       rooms[room].userCount--;
       if (rooms[room].userCount > 0) { 
         const usersInRoom = io.sockets.adapter.rooms.get(room);
         const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
-        // We only tell users who are *currently viewing* the chat room about the updated online list.
         socket.to(room).emit('roomUsers', userList);
       }
     }
   });
 
   socket.on('disconnect', () => handleUserLeave(socket));
+
+  // Add this new socket handler in the io.on('connection', (socket) => { block
+
+socket.on('leaveRoomPermanently', (data) => {
+  const { room, userId } = data;
+  const user = users[socket.id];
+  
+  if (user && rooms[room]) {
+    // Remove user from room members
+    if (rooms[room].members) {
+      rooms[room].members = rooms[room].members.filter(id => id !== userId);
+    }
+    
+    // Remove from active viewers
+    if (activeViewers[room]) {
+      activeViewers[room].delete(socket.id);
+      const viewerList = Array.from(activeViewers[room]);
+      io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
+    }
+    
+    // Update user count
+    rooms[room].userCount--;
+    
+    // IMPORTANT: Emit confirmation BEFORE leaving the room
+    socket.emit('leftRoomPermanently', { room });
+    
+    // Leave the Socket.IO room
+    socket.leave(room);
+    
+    // Update the user list for remaining users
+    const usersInRoom = io.sockets.adapter.rooms.get(room);
+    const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
+    io.to(room).emit('roomUsers', userList);
+    
+    // Clean up room if empty
+    if (rooms[room].userCount <= 0 && (!rooms[room].members || rooms[room].members.length === 0)) {
+      delete rooms[room];
+      delete messageHistory[room];
+      delete activeViewers[room];
+      console.log(`[SERVER LOG] Room deleted: ${room}`);
+    }
+  }
+  });
+  // Add this new socket handler for creator deleting the room entirely
+socket.on('deleteRoomAsCreator', (data) => {
+  const { room, userId } = data;
+  const user = users[socket.id];
+  
+  if (user && rooms[room]) {
+    // Mark the room as deleted by creator
+    rooms[room].deletedBy = userId;
+    rooms[room].deletedAt = new Date();
+    
+    // Remove creator from active viewers
+    if (activeViewers[room]) {
+      activeViewers[room].delete(socket.id);
+      const viewerList = Array.from(activeViewers[room]);
+      io.to(room).emit('activeViewersUpdate', { room, viewers: viewerList });
+    }
+    
+    // Leave the Socket.IO room
+    socket.leave(room);
+    
+    // Update user count
+    rooms[room].userCount--;
+    
+    // Notify all members that the room was deleted
+    io.to(room).emit('roomDeletedByCreator', { 
+      room, 
+      deletedBy: user.name,
+      deletedAt: rooms[room].deletedAt
+    });
+    
+    // Confirm to creator
+    socket.emit('leftRoomPermanently', { room });
+    
+    // Update the user list for remaining users
+    const usersInRoom = io.sockets.adapter.rooms.get(room);
+    const userList = usersInRoom ? Array.from(usersInRoom).map(id => users[id]).filter(Boolean) : [];
+    io.to(room).emit('roomUsers', userList);
+    
+    console.log(`[SERVER LOG] Room deleted by creator: ${room}`);
+  }
+  });
+
+  socket.on('dismissDeletedRoom', (data) => {
+  const { room, userId } = data;
+  
+  if (rooms[room] && rooms[room].deletedBy) {
+    // Remove user from room members
+    if (rooms[room].members) {
+      rooms[room].members = rooms[room].members.filter(id => id !== userId);
+    }
+    
+    // Leave the Socket.IO room
+    socket.leave(room);
+    
+    // Update user count
+    rooms[room].userCount--;
+    
+    // Clean up room if no members left
+    if (rooms[room].members.length === 0) {
+      delete rooms[room];
+      delete messageHistory[room];
+      delete activeViewers[room];
+      console.log(`[SERVER LOG] Deleted room cleaned up: ${room}`);
+    }
+    
+    socket.emit('roomDismissed', { room });
+  }
+});
 });
 
 const PORT = process.env.PORT || 4000;

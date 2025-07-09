@@ -1,4 +1,3 @@
-/* client/src/App.css */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -11,8 +10,7 @@ body {
   margin: 0;
 }
 
-/* CHANGED: Made the overall chat app larger */
-.App {
+.app {
   width: 80vw;
   max-width: 1000px;
   height: 90vh;
@@ -21,30 +19,98 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
+/* --- Home Container --- */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.header h1 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.header p {
+  margin: 0;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.forms-section {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 30px;
+  justify-content: center;
+}
+
+.error-message {
+  color: #d93025;
+  text-align: center;
+  margin: 15px 0;
+  padding: 10px;
+  background-color: #fce8e6;
+  border-radius: 4px;
+}
+
+/* --- Join Form --- */
 .joinChatContainer {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
   text-align: center;
-  margin: auto;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  min-width: 280px;
+}
+
+.joinChatContainer h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.joinChatContainer .form-description {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.4;
 }
 
 .joinChatContainer input {
   width: 210px;
   height: 40px;
-  margin: 7px auto;
+  margin: 7px 0;
   border: 2px solid #bde0fe;
   border-radius: 5px;
-  padding: 5px;
+  padding: 5px 10px;
   font-size: 16px;
+  box-sizing: border-box;
 }
 
 .joinChatContainer button {
   width: 225px;
   height: 50px;
-  margin: 7px auto;
+  margin: 7px 0;
   border: none;
   border-radius: 5px;
   padding: 5px;
@@ -52,68 +118,214 @@ body {
   background-color: #0084ff;
   color: #fff;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .joinChatContainer button:hover {
   background-color: #0073e6;
 }
 
+/* --- Room List --- */
+.room-list {
+  margin-top: 20px;
+}
+
+.room-list h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.room-item {
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+.room-item.deleted-room {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  cursor: default;
+}
+
+.room-item.deleted-room:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.room-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.room-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.creator-badge {
+  background: #28a745;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.unread-count {
+  background-color: #f44336;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 20px;
+}
+
+.delete-room-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.delete-room-btn:hover {
+  background: #cc0000;
+  transform: scale(1.1);
+}
+
+.no-rooms {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  margin-top: 20px;
+}
+
+/* --- Chat Container --- */
 .chat-container {
   display: flex;
   width: 100%;
   height: 100%;
-  overflow: hidden;
 }
 
-/* --- Sidebar Styles --- */
-.users-sidebar {
-  width: 0; /* Hidden by default */
+.sidebar {
+  width: 240px;
   background-color: #f7f7f7;
   border-right: 1px solid #ddd;
-  padding: 10px 0;
+  padding: 15px;
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease, padding 0.3s ease;
-  overflow: hidden; 
-  white-space: nowrap;
-  overflow-y: auto; 
-  flex-shrink: 0; /* Add this line */
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
-.users-sidebar.open {
-  width: 240px;
-  padding: 10px;
+.sidebar.open { 
+  width: 240px; 
 }
 
-.users-sidebar h4 {
-  margin-top: 0;
+.sidebar.closed { 
+  width: 0; 
+  padding: 0; 
+}
+
+.sidebar-header {
   border-bottom: 1px solid #ccc;
-  padding-bottom: 10px;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
 }
 
-.users-sidebar ul {
+.sidebar-header h3 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.back-button {
+  background: none;
+  border: 1px solid #aaa;
+  color: #555;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: #f0f0f0;
+}
+
+.online-users, .active-viewers {
+  margin-bottom: 20px;
+}
+
+.online-users h4, .active-viewers h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.online-users ul {
   list-style-type: none;
   padding: 0;
   margin: 0;
 }
 
-.users-sidebar li {
-  padding: 8px 0;
+.online-users li {
+  padding: 5px 0;
   font-size: 0.9rem;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.user-name {
   color: #333;
 }
 
-/* NEW: Style for the typing indicator in the sidebar */
-.sidebar-typing-indicator {
-  font-style: italic;
-  color: #777;
-  font-size: 0.8rem;
-  margin-left: 8px;
+.you-badge {
+  background: #0084ff;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
-/* --- Main Chat Area Styles --- */
+.viewer-count {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 .chat-main {
-  flex-grow: 1;
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -129,103 +341,149 @@ body {
   flex-shrink: 0;
 }
 
-.chat-header .sidebar-toggle {
+.sidebar-toggle {
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   margin-right: 15px;
+  padding: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
 }
 
-.chat-window {
-  flex-grow: 1;
+.sidebar-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: white;
+}
+
+.chat-messages {
+  flex: 1;
   padding: 20px;
   overflow-y: auto;
-  border-bottom: 1px solid #ddd;
   background-color: #e5ddd5;
-}
-
-/* --- Message Bubble Styles --- */
-.message {
-  margin: 10px 0;
   display: flex;
+  flex-direction: column;
 }
 
-.message#you {
+.message {
+  margin: 8px 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.message.own-message {
   justify-content: flex-end;
 }
 
-.message#other {
+.message.other-message {
   justify-content: flex-start;
 }
 
-.message-bubble {
+.message-content {
   max-width: 70%;
-  padding: 10px 15px;
-  display: flex;
-  flex-direction: column;
+  padding: 8px 12px;
+  border-radius: 18px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-.message#you .message-bubble {
-  background-color: #bde0fe;
-  border-radius: 20px 20px 5px 20px;
+.message.own-message .message-content {
+  background-color: #dcf8c6;
+  border-radius: 18px 18px 5px 18px;
 }
 
-.message#other .message-bubble {
-  background-color: #f1f8e9;
-  border-radius: 20px 20px 20px 5px;
+.message.other-message .message-content {
+  background-color: #ffffff;
+  border-radius: 18px 18px 18px 5px;
+}
+
+.message-content:hover {
+  opacity: 0.9;
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 8px;
 }
 
 .message-author {
   font-size: 0.8rem;
   font-weight: bold;
-  color: #555;
-  margin: 0 0 8px;
-}
-
-/* CHANGED: Added word-wrap to handle long messages */
-.message-text {
   margin: 0;
-  font-size: 1rem;
-  color: #000;
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  white-space: pre-wrap; /* Preserve line breaks */
 }
 
 .message-time {
   font-size: 0.7rem;
-  color: #555;
-  margin: 5px 0 0;
-  align-self: flex-end;
+  color: #666;
+  margin: 0;
 }
 
-/* --- Chat Input Form Styles --- */
-.chat-form {
-  display: flex;
-  padding: 10px;
-  background-color: #f0f0f0;
-  align-items: flex-start; /* Align items to the top */
+.message-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #000;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.3;
 }
 
-/* CHANGED: Styles updated for a textarea */
+.message-status {
+  font-size: 0.7rem;
+  color: #666;
+  margin-top: 2px;
+  text-align: right;
+}
+
+.typing-indicator {
+  padding: 8px 12px;
+  font-style: italic;
+  color: #666;
+  font-size: 0.85rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 15px;
+  margin: 5px 0;
+  align-self: flex-start;
+}
+
 .chat-input {
-  flex-grow: 1;
+  display: flex;
+  padding: 15px;
+  background-color: #f0f0f0;
+  align-items: flex-end;
+  gap: 10px;
+  border-top: 1px solid #ddd;
+}
+
+.chat-input textarea {
+  flex: 1;
   border: 1px solid #ccc;
   border-radius: 20px;
   padding: 10px 15px;
   font-size: 1rem;
   font-family: inherit;
-  resize: none; /* Disable manual resizing */
-  min-height: 24px; /* Roughly 1 line */
-  max-height: 80px; /* Roughly 4 lines */
-  overflow-y: auto; /* Enable scrolling after max-height */
-  margin-right: 10px;
+  resize: none;
+  min-height: 20px;
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.4;
 }
 
-.send-button {
+.chat-input textarea:focus {
+  outline: none;
+  border-color: #0084ff;
+}
+
+.chat-input button {
   background-color: #0084ff;
   color: white;
   border: none;
@@ -233,126 +491,20 @@ body {
   border-radius: 20px;
   cursor: pointer;
   font-size: 1rem;
-  flex-shrink: 0; /* Prevent the button from shrinking */
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
 }
 
-.send-button:hover {
+.chat-input button:hover:not(:disabled) {
   background-color: #0073e6;
 }
 
-.initial-screen {
-  text-align: center;
-  margin: auto;
+.chat-input button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
-.initial-buttons button {
-  font-size: 1.2rem;
-  padding: 15px 30px;
-  margin: 0 20px;
-  cursor: pointer;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.back-button {
-  display: block;
-  margin: 10px auto;
-  background: none;
-  border: 1px solid #aaa;
-  color: #555;
-  border-radius: 5px;
-  padding: 8px 15px;
-  cursor: pointer;
-}
-
-.error-message {
-  color: #d93025;
-  text-align: center;
-  margin-top: 15px;
-}
-
-.home-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.home-header {
-  padding: 15px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #ddd;
-  flex-shrink: 0;
-}
-
-.home-header h2 {
-  margin: 0;
-}
-
-.home-header .actions button {
-  margin-left: 10px;
-  padding: 8px 15px;
-  cursor: pointer;
-  border: 1px solid #0073e6;
-  background-color: #fff;
-  color: #0073e6;
-  border-radius: 5px;
-  font-size: 0.9rem;
-}
-
-.home-header .actions button:hover {
-  background-color: #f0f8ff;
-}
-
-.room-list {
-  padding: 20px;
-  overflow-y: auto;
-  flex-grow: 1;
-}
-
-.room-list h3 {
-  margin-top: 0;
-  color: #555;
-}
-
-.room-item {
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 15px;
-  cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.room-item:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  transform: translateY(-2px);
-}
-
-.room-item h4 {
-  margin: 0 0 5px 0;
-}
-
-.room-item p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #777;
-}
-
-.chat-header .home-button {
-  background: none;
-  border: 1px solid white;
-  color: white;
-  border-radius: 5px;
-  margin-left: auto;
-  cursor: pointer;
-}
-
-/* client/src/App.css - Add to bottom */
-
+/* --- Modal Styles --- */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -367,7 +519,6 @@ body {
   padding: 20px;
 }
 
-/* This is now a flex container that won't exceed the screen height */
 .modal-content {
   background: white;
   padding: 20px;
@@ -377,14 +528,15 @@ body {
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   display: flex;
   flex-direction: column;
-  max-height: 80vh; /* Limit the modal's max height */
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .modal-content h3 {
   margin-top: 0;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
-  flex-shrink: 0; /* Prevent from shrinking */
+  color: #333;
 }
 
 .message-info-bubble {
@@ -392,21 +544,30 @@ body {
   border-radius: 8px;
   padding: 10px;
   margin-bottom: 20px;
-  flex-shrink: 0; /* Prevent from shrinking */
 }
 
-/* This is now the main scrollable area */
+.message-info-bubble .message-text {
+  color: #333;
+  font-size: 0.95rem;
+  margin-bottom: 5px;
+}
+
+.message-info-bubble .message-time {
+  color: #666;
+  font-size: 0.8rem;
+}
+
 .seen-by-list {
-  flex-grow: 1; /* Allow this section to grow and fill available space */
-  overflow-y: auto; /* Add a scrollbar only when needed */
-  min-height: 50px; /* Ensure it has some height even if empty */
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 50px;
 }
 
 .seen-by-list h4 {
-  margin-bottom: 10px;
+  margin: 0 0 10px 0;
+  color: #333;
 }
 
-/* The <ul> no longer needs scroll properties */
 .seen-by-list ul {
   list-style-type: none;
   padding: 0;
@@ -416,6 +577,7 @@ body {
 .seen-by-list li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -424,41 +586,224 @@ body {
   border-bottom: none;
 }
 
+.seen-by-name {
+  color: #333;
+  font-weight: 500;
+}
+
 .seen-by-status {
-  color: #555;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.modal-close-button {
+  background-color: #0084ff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: background-color 0.2s ease;
+}
+
+.modal-close-button:hover {
+  background-color: #0073e6;
+}
+
+/* --- Delete Confirmation Modal --- */
+.delete-confirmation-modal {
+  max-width: 400px;
+  text-align: center;
+}
+
+.delete-confirmation-modal h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.delete-confirmation-modal p {
+  margin-bottom: 15px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.warning-text {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.cancel-button {
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.cancel-button:hover {
+  background: #e9e9e9;
+}
+
+.confirm-delete-button {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.confirm-delete-button:hover {
+  background: #cc0000;
+}
+
+/* --- Creator Delete Modal --- */
+.creator-delete-modal {
+  max-width: 500px;
+}
+
+.creator-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.option-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: left;
+}
+
+.option-card h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.option-card p {
+  margin: 0 0 15px 0;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.delete-option-button {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.delete-option-button:hover {
+  background: #cc0000;
+}
+
+.leave-option-button {
+  background: #ffa500;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.leave-option-button:hover {
+  background: #ff8c00;
+}
+
+/* --- Deleted Room Notification --- */
+.deleted-room-notification {
+  width: 100%;
+}
+
+.notification-content {
+  text-align: left;
+}
+
+.notification-content h4 {
+  margin: 0 0 10px 0;
+  color: #856404;
+}
+
+.notification-content p {
+  margin: 0 0 8px 0;
+  color: #856404;
   font-size: 0.9rem;
 }
 
-/* The button is now a fixed footer */
-.modal-close-button {
-  display: block;
-  padding: 10px 20px;
-  border: none;
-  background-color: #0084ff;
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px; /* Add space above the button */
-  flex-shrink: 0; /* Prevent from shrinking */
-}
-
-.room-item {
-  /* Add this to enable flexbox for badge alignment */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.unread-badge {
-  background-color: #f44336; /* Red color */
-  color: white;
+.deletion-time {
   font-size: 0.8rem;
-  font-weight: bold;
-  border-radius: 50%; /* Make it a circle */
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-shrink: 0; /* Prevent it from shrinking */
+  color: #856404;
+  margin-bottom: 10px !important;
+}
+
+.dismiss-button {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.2s ease;
+}
+
+.dismiss-button:hover {
+  background: #5a6268;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 768px) {
+  .app {
+    width: 95vw;
+    height: 95vh;
+  }
+  
+  .forms-section {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .joinChatContainer {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .sidebar {
+    width: 200px;
+  }
+  
+  .sidebar.open {
+    width: 200px;
+  }
+  
+  .message-content {
+    max-width: 85%;
+  }
+  
+  .modal-content {
+    width: 95%;
+    max-width: 350px;
+  }
 }
