@@ -736,7 +736,7 @@ function App() {
             </div>
             
             <div className="online-users">
-              <h4>Online Users ({onlineUsers.length})</h4>
+              <h4>Room Members ({onlineUsers.length})</h4>
               <ul>
                 {onlineUsers.map(user => {
                   // activeViewers is an array of socket ID strings
@@ -755,7 +755,7 @@ function App() {
             </div>
             
             <div className="active-viewers">
-              <h4>Active Viewers ({activeViewers.length})</h4>
+              <h4>Online User ({activeViewers.length})</h4>
               <p className="viewer-count">{activeViewers.length} viewing chat</p>
             </div>
           </div>
