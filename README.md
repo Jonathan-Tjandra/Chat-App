@@ -21,7 +21,7 @@ This application includes a robust set of features designed to mimic a modern ch
 
 ### 💬 **Chat & Messaging**
 * **Real-time Messaging:** Live messaging powered by WebSockets.
-* **Message History:** The server stores the last 50 messages for each room, which are loaded instantly upon joining.
+* **Message History:** The server stores message history for each room, which are loaded instantly upon joining.
 * **Message Search:** A search bar within a chat session to find specific messages.
 * **Read Receipts ("Message Info"):**
     * Clicking on any message opens a modal with its delivery information.
